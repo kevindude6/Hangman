@@ -1,7 +1,7 @@
 import React from 'react';
 const KeyboardDisplay = (props) => {
   const makeButton = (letter) => {
-    if (props.guessedLetters.includes(letter)) {
+    if (props.gameState.guessedLetters && props.gameState.guessedLetters.includes(letter)) {
       return (
         <button key={letter} disabled onClick={() => props.clickHandler(letter)}>
           {letter}

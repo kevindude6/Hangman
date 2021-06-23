@@ -10,8 +10,9 @@ import { LostGameText, WonGameText } from './Components/GameComponents';
 
 
 function App() {
+  axios.defaults.withCredentials = true;
 
-  const [guessedLetters, setGuessedLetters] = useState([]);
+  //const [guessedLetters, setGuessedLetters] = useState([]);
   const [gameState, setGameState] = useState({
     state: 'loading',
     displayWord: 'Loading...',
@@ -20,31 +21,27 @@ function App() {
 
   //Query server on load
   useEffect(() => {
-    newGame();
+    queryGame();
   }, []);
 
-  //Tell server to delete game on window close
-  useEffect(() => {
-    window.addEventListener('beforeunload', (ev) => {
-      if (gameState['gameId']) {
-        axios.delete('http://localhost:9191/clearGame?id=' + gameState.gameId);
-        delete gameState['gameId'];
-      }
-    });
-  }, [gameState]);
-
   //Start a new game
-  const newGame = () => {
-    setGuessedLetters([]);
-    axios.post(`http://localhost:9191/startGame`).then((value) => {
+  const queryGame = () => {
+    //setGuessedLetters([]);
+    axios.get(`http://localhost:9191/getGameState`).then((value) => {
       setGameState(value.data);
     });
   };
+  
+  const sendReset = () => {
+    axios.post(`http://localhost:9191/resetGame`).then((value) => {
+      setGameState(value.data);
+    });
+  }
 
   //Send a guess to the server
   const letterGuessHandler = (toGuess) => {
     axios
-      .get(`http://localhost:9191/guess?id=${gameState.gameId}&guess=${toGuess}`)
+      .get(`http://localhost:9191/guess?guess=${toGuess}`)
       .then((value) => {
         if (value.status === 200) {
           setGameState(value.data);
@@ -59,15 +56,13 @@ function App() {
       displayWord: 'Loading',
       state: 'loading',
     }));
-    axios.delete(`http://localhost:9191/clearGame?id=${gameState.gameId}`).then(() => {
-      newGame();
-    });
+    
+    sendReset();
   };
 
   //Handler for when the onscreen keyboard is pressed
   const buttonClickHandler = (letter) => {
     if (gameState.state === '') {
-      setGuessedLetters((prev) => [...prev, letter]);
       letterGuessHandler(letter);
     }
   };
@@ -79,7 +74,7 @@ function App() {
     <GuessDisplay gstate={gameState} />
     <LostGameText gameState={gameState} resetHandler={resetHandler}/>
     <WonGameText gameState={gameState} resetHandler={resetHandler}/>
-    <KeyboardDisplay guessedLetters={guessedLetters} setGuessedLetters={setGuessedLetters} clickHandler={buttonClickHandler}/>
+    <KeyboardDisplay gameState={gameState} clickHandler={buttonClickHandler}/>
   </div>);
 }
 

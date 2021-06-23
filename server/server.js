@@ -1,13 +1,24 @@
 const express = require('express');
 const app = express();
 const axios = require('axios');
-const { v1: uuidv1, v4: uuidv4 } = require('uuid');
+const session = require('express-session');
 var cors = require('cors');
 
 
 //boilerplate
 app.use(express.json());
-app.use(cors());
+app.use(cors({
+  credentials: true,
+  origin: "http://localhost:3000"
+}));
+
+var sessProperties = {
+  secret: 'yeehaw',
+  cookie: {secure: false},
+  resave: true,
+  saveUninitialized: true
+}
+app.use(session(sessProperties));
 
 app.listen(9191);
 
@@ -29,14 +40,14 @@ const GetRandomWord = async () => {
 const games = {};
 const gameWords = {};
 
-const MakeNewGame = async () => {
-  let gameId = uuidv1();
+const MakeNewGame = async (gameId) => {
   let targetWord = await GetRandomWord();
   let displayWord = '_'.repeat(targetWord.length);
   let remainingGuesses = 7;
   let state = '';
+  let guessedLetters = [];
 
-  games[gameId] = { gameId, displayWord, remainingGuesses, state };
+  games[gameId] = { gameId, displayWord, remainingGuesses, state, guessedLetters };
   gameWords[gameId] = targetWord;
 
   return games[gameId];
@@ -44,14 +55,29 @@ const MakeNewGame = async () => {
 const DoGuess = (gameId, guess) => {
   //Check game is valid
   if (!games[gameId]) {
+    console.log("Game does not exist");
     throw new Error('Game does not exist');
   }
   
   let game = games[gameId];
   if (game.remainingGuesses <= 0 || game.state != '') {
+    console.log("Game is over");
     throw new Error('Game is over');
   }
 
+  if(!game.guessedLetters)
+  {
+    console.log("no guessed letters");
+  }
+
+  if(game.guessedLetters.includes(guess))
+  {
+    console.log("already guessed");
+    throw new Error('Already guessed!');
+  }
+
+  game.guessedLetters.push(guess);
+  
   //Check guess is valid
   let validGuess = false;
   let targetWord = gameWords[gameId];
@@ -93,25 +119,20 @@ const DoGuess = (gameId, guess) => {
 
 //routing
 app.get('/getGameState', (req, res) => {
-  if (games[req.query.id]) {
-    res.send(games[req.query.id]);
+  if (games[req.sessionID]) {
+    res.send(games[req.sessionID]);
   } else {
-    res.sendStatus(404);
+    MakeNewGame(req.sessionID).then((result) => res.send(result));
   }
 });
-app.post('/startGame', (req, res) => {
-  MakeNewGame().then((result) => res.send(result));
+app.post('/resetGame', (req, res) => {
+  MakeNewGame(req.sessionID).then((result) => res.send(result));
 });
 app.get('/guess', (req, res) => {
   try {
-    res.send(DoGuess(req.query.id, req.query.guess));
+    res.send(DoGuess(req.sessionID, req.query.guess));
   } catch (e) {
     res.sendStatus(400); //TODO provide more information
   }
 });
-app.delete('/clearGame', (req, res) => {
-  console.log('clearing game ' + req.query.id);
-  delete games[req.query.id];
-  delete gameWords[req.query.id];
-  res.sendStatus(200);
-});
+
